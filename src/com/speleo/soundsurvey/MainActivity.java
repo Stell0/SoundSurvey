@@ -23,15 +23,15 @@ import android.media.MediaRecorder;
 
 
 public class MainActivity extends Activity {
-	private static final int RECORDER_SAMPLERATE = 8000;
+	private static final int RECORDER_SAMPLERATE = 8000; //use 8000 if you encode in mp4 due to performance issue
 	private static final boolean ENCODE_MPEG4 = true;
-	private static final int RECORDER_CHANNELS = AudioFormat.CHANNEL_IN_STEREO;
+	private static final int RECORDER_CHANNELS = AudioFormat.CHANNEL_IN_STEREO; //use AudioFormat.CHANNEL_IN_MONO if you encode in mp4 due to performance issue
 	private static final int RECORDER_AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
     static int COMPRESSED_AUDIO_FILE_BIT_RATE = 320000; // 320kbps
     static final String COMPRESSED_AUDIO_FILE_MIME_TYPE = "audio/mp4a-latm";
     static final int CODEC_TIMEOUT_IN_MS = 5000;
 	public static int bufferSize = AudioRecord.getMinBufferSize(RECORDER_SAMPLERATE, RECORDER_CHANNELS, RECORDER_AUDIO_ENCODING)*20;
-	public static int trigger = 300; // value that trigger recording. 100 is a low value
+	public static int trigger = 300; // value that trigger recording. Proportional to sample rate and channels
 	public static int secondsAfterSilence=5; //continue recording after last trigger
 	public static boolean recording = false;
 	public static boolean isRecording = false;
@@ -224,8 +224,20 @@ public class MainActivity extends Activity {
     	{
     		/*Get current timestamp to write it in filename*/
 			Long tsLong = System.currentTimeMillis();
-			String ts = tsLong.toString();	
-			String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + ts + "_8k16bitMono.mp4";
+			String ts = tsLong.toString();
+			String extension;
+			String chan;
+			if (ENCODE_MPEG4) 
+				extension = ".mp4";
+			else 
+				extension = ".pcm";
+			if (RECORDER_CHANNELS==AudioFormat.CHANNEL_IN_STEREO)
+				chan = "Stereo";
+			else 
+				chan = "Mono";
+
+			String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + ts + "_" + 
+			RECORDER_SAMPLERATE + "_16bit_"+chan+extension;
 			try {
 				outFile = new File(filePath);
 				Log.i("IO","created a new file: " + filePath);
