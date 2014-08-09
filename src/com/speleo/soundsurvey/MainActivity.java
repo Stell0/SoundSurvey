@@ -204,7 +204,7 @@ public class MainActivity extends Activity {
     static private File outFile = null;
     static MediaMuxer mux = null;
     static MediaFormat outputFormat = null;
-    static int COMPRESSED_AUDIO_FILE_BIT_RATE = 256000; // 256kbps
+    static int COMPRESSED_AUDIO_FILE_BIT_RATE = 320000; // 320kbps
     static final String COMPRESSED_AUDIO_FILE_MIME_TYPE = "audio/mp4a-latm";
     static MediaCodec codec;
     static ByteBuffer[] codecInputBuffers;
@@ -305,9 +305,9 @@ public class MainActivity extends Activity {
     					codec.releaseOutputBuffer(outputBufferIndex, false);
     				} else 
     				{
-    					Log.d("codec","writing data...");
+    					//Log.d("codec","writing data...");
     					mux.writeSampleData(audioTrackIdx, codecOutputBuffers[outputBufferIndex], outBuffInfo);
-    					Log.d("mux","written " + outBuffInfo.size);
+    					//Log.d("mux","written " + outBuffInfo.size);
     					codec.releaseOutputBuffer(outputBufferIndex, false);
     				}
     			} else if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) 
