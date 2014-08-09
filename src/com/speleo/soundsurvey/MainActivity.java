@@ -1,6 +1,7 @@
 package com.speleo.soundsurvey;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -24,11 +25,17 @@ import android.media.MediaRecorder;
 public class MainActivity extends Activity {
 	private static final int RECORDER_SAMPLERATE = 8000;
 	private static final boolean ENCODE_MPEG4 = true;
-	private static final int RECORDER_CHANNELS = AudioFormat.CHANNEL_IN_MONO;
+	private static final int RECORDER_CHANNELS = AudioFormat.CHANNEL_IN_STEREO;
 	private static final int RECORDER_AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
+    static int COMPRESSED_AUDIO_FILE_BIT_RATE = 320000; // 320kbps
+    static final String COMPRESSED_AUDIO_FILE_MIME_TYPE = "audio/mp4a-latm";
+    static final int CODEC_TIMEOUT_IN_MS = 5000;
 	public static int bufferSize = AudioRecord.getMinBufferSize(RECORDER_SAMPLERATE, RECORDER_CHANNELS, RECORDER_AUDIO_ENCODING)*20;
+	public static int trigger = 300; // value that trigger recording. 100 is a low value
+	public static int secondsAfterSilence=5; //continue recording after last trigger
 	public static boolean recording = false;
 	public static boolean isRecording = false;
+	
 	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,8 +109,6 @@ public class MainActivity extends Activity {
 		byte prev=0;
 		ByteBuffer bb = ByteBuffer.allocate(2);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
-		int trigger = 300; // value that trigger recording. 100 is a low value
-		int secondsAfterSilence=5; //continue recording after last trigger
     	int silenceCounter=secondsAfterSilence+1; //ugly but simple. This avoid loop to start like it was the first silence after sound
     	while (listening)
     	{
@@ -135,7 +140,7 @@ public class MainActivity extends Activity {
     		 if (rms>trigger) //the buffer average volume is bigger than trigger value
     		 {
     			//start recording if not, put silenceCounter to 0
-    			 Log.d("status","recording...");
+    			 //Log.d("status","recording...");
     			 recording = true; 
     			 silenceCounter=0;
     		 } 
@@ -204,15 +209,13 @@ public class MainActivity extends Activity {
     static private File outFile = null;
     static MediaMuxer mux = null;
     static MediaFormat outputFormat = null;
-    static int COMPRESSED_AUDIO_FILE_BIT_RATE = 320000; // 320kbps
-    static final String COMPRESSED_AUDIO_FILE_MIME_TYPE = "audio/mp4a-latm";
     static MediaCodec codec;
     static ByteBuffer[] codecInputBuffers;
     static ByteBuffer[] codecOutputBuffers;
     static MediaCodec.BufferInfo outBuffInfo;
-    static final int CODEC_TIMEOUT_IN_MS = 5000;
     static int audioTrackIdx = 0;
     static long startTime = System.nanoTime();
+    static FileOutputStream fos = null;
     
     public static void output(ByteBuffer buffer)
     {
@@ -232,7 +235,7 @@ public class MainActivity extends Activity {
     	} 
     	else 
     	{
-    		Log.d("IO","append data to existing file");
+    		//Log.d("IO","append data to existing file");
     	}
     	
     	if (ENCODE_MPEG4) 
@@ -248,6 +251,13 @@ public class MainActivity extends Activity {
     				outputFormat = MediaFormat.createAudioFormat(COMPRESSED_AUDIO_FILE_MIME_TYPE,RECORDER_SAMPLERATE, 1);
     				outputFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
     				outputFormat.setInteger(MediaFormat.KEY_BIT_RATE, COMPRESSED_AUDIO_FILE_BIT_RATE);
+    				if (RECORDER_CHANNELS == AudioFormat.CHANNEL_IN_STEREO)
+    				{
+    					outputFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 2);
+    				} else
+    				{
+    					outputFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+    				}
     				codec = MediaCodec.createEncoderByType(COMPRESSED_AUDIO_FILE_MIME_TYPE);
     				codec.configure(outputFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
     				codec.start();
@@ -327,13 +337,26 @@ public class MainActivity extends Activity {
     				}    			
     		} while (outBuffInfo.flags != MediaCodec.BUFFER_FLAG_END_OF_STREAM && outputBufferIndex !=-1 );
     	} else {
-    		/*no mpeg4 encoding 
-    		 *TODO write raw data to the file*/    		
+    		/*no mpeg4 encoding*/
+    		if (fos==null)
+    		{
+    			try {
+    				fos = new FileOutputStream(outFile);
+    			} catch (Exception e){
+    				e.printStackTrace();
+    			}
+    		}
+    		try {
+    			fos.write(buffer.array());
+    		} catch (Exception e){
+				e.printStackTrace();
+			}
     	}
 }
 
 public static void closeOutput()
     {
+	if (ENCODE_MPEG4) {
     	int inputBufferIndex = codec.dequeueInputBuffer(CODEC_TIMEOUT_IN_MS);
     	if (inputBufferIndex >= 0) {
     		codec.queueInputBuffer(inputBufferIndex, 0,0,(long)System.nanoTime(),MediaCodec.BUFFER_FLAG_END_OF_STREAM);
@@ -361,7 +384,23 @@ public static void closeOutput()
     	mux.stop();
         mux.release();
         mux=null;
-        outFile=null;
+	} 
+	else 
+	{
+	//no mpeg4 encoding
+	if (fos!=null)
+		{
+			try {
+				fos.flush();
+				fos.close();
+				fos = null;
+			} catch (Exception e)
+			{
+				e.printStackTrace();
+			}
+		}
+	}
+	outFile=null;
     }
     
 }
